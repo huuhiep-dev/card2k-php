@@ -1,0 +1,27 @@
+name: spec
+
+# Mỗi ngày so bản chụp resources/openapi.json với spec đang chạy trên card2k.net.
+# Đỏ nghĩa là API v3 đã thêm / đổi gì đó: chạy `php bin/check-spec.php --update`,
+# `php bin/generate-models.php`, thêm method nếu có endpoint mới, rồi phát hành bản SDK mới.
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php: '8.3'
+          coverage: none
+
+      - name: So bản chụp với card2k.net
+        run: php bin/check-spec.php

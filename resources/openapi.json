@@ -1,0 +1,2575 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "API v3",
+        "version": "3.1.0",
+        "description": "REST API v3 của shop cho đối tác: tài khoản, sản phẩm (nạp game, thẻ cào, Sò Garena hàng chờ), đặt đơn và tra đơn, đổi thẻ cào, ví (nạp tiền, chuyển ví, lịch sử giao dịch), bảo hành, đổi phí ưu tiên Sò, kiểm tra mã giảm giá, sự kiện webhook.\n\n- Xác thực: header `Authorization: Bearer <api_key>` (kết nối loại API v3).\n- Tiền: số nguyên VND. Thời gian: ISO 8601.\n- Lỗi: mã HTTP thật và `{ \"error\": { \"code\", \"message\", … } }`. Xử lý theo `code`, không theo `message`.\n- Mỗi phản hồi có header `X-Request-Id`.\n- Tương thích: trong v3 chỉ **thêm** field, endpoint, mã lỗi; không đổi hay bỏ thứ đã có. Code của bạn nên bỏ qua field lạ."
+    },
+    "servers": [
+        {
+            "url": "{base_url}/api/v3",
+            "variables": {
+                "base_url": {
+                    "default": "https://card2k.net"
+                }
+            }
+        }
+    ],
+    "security": [
+        {
+            "bearer": []
+        }
+    ],
+    "tags": [
+        {
+            "name": "Tài khoản"
+        },
+        {
+            "name": "Ví"
+        },
+        {
+            "name": "Sản phẩm"
+        },
+        {
+            "name": "Đơn hàng"
+        },
+        {
+            "name": "Đổi thẻ"
+        },
+        {
+            "name": "Bảo hành"
+        },
+        {
+            "name": "Webhook"
+        }
+    ],
+    "paths": {
+        "/me": {
+            "get": {
+                "operationId": "getAccount",
+                "tags": ["Tài khoản"],
+                "summary": "Số dư, rank, quyền của key, giới hạn mỗi đơn",
+                "responses": {
+                    "200": {
+                        "description": "Tài khoản",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AccountResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/products": {
+            "get": {
+                "operationId": "listProducts",
+                "tags": ["Sản phẩm"],
+                "summary": "Sản phẩm đang bán, giá theo rank của bạn",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": ["game", "card", "garena_queue"]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Danh sách sản phẩm",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/products/{id}": {
+            "get": {
+                "operationId": "getProduct",
+                "tags": ["Sản phẩm"],
+                "summary": "Một sản phẩm",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sản phẩm",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/orders": {
+            "get": {
+                "operationId": "listOrders",
+                "tags": ["Đơn hàng"],
+                "summary": "Đơn đặt qua kết nối này",
+                "description": "Mặc định mới nhất trước. Có `updated_since` thì chỉ đơn có thay đổi từ lúc đó, thay đổi cũ nhất trước.",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/OrderStatus"
+                        }
+                    },
+                    {
+                        "name": "reference",
+                        "in": "query",
+                        "required": false,
+                        "description": "Idempotency-Key lúc đặt đơn",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9_\\-.:]{1,64}$"
+                        }
+                    },
+                    {
+                        "name": "updated_since",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Một trang đơn",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "createOrder",
+                "tags": ["Đơn hàng"],
+                "summary": "Đặt đơn (trừ Ví mua hàng)",
+                "description": "Cần quyền `orders`. Cùng `Idempotency-Key` và cùng nội dung → HTTP 200 với đơn cũ, không trừ tiền lần nữa; cùng key, nội dung khác → 422 `idempotency_key_reused`.",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9_\\-.:]{1,64}$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Đã tạo đơn",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderResponse"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Đơn đã tạo trước đó với cùng key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "402": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/orders/{code}": {
+            "get": {
+                "operationId": "getOrder",
+                "tags": ["Đơn hàng"],
+                "summary": "Một đơn",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Đơn",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/events": {
+            "get": {
+                "operationId": "listEvents",
+                "tags": ["Webhook"],
+                "summary": "Sự kiện webhook 30 ngày gần nhất, cũ nhất trước",
+                "parameters": [
+                    {
+                        "name": "after",
+                        "in": "query",
+                        "required": false,
+                        "description": "event_id cuối cùng đã đọc",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Một trang sự kiện",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EventListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/transactions": {
+            "get": {
+                "operationId": "listTransactions",
+                "tags": ["Ví"],
+                "summary": "Biến động hai ví của tài khoản (cả trên web), mới nhất trước",
+                "parameters": [
+                    {
+                        "name": "wallet",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/Wallet"
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Một trang biến động",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TransactionListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/card-exchange/rates": {
+            "get": {
+                "operationId": "getCardExchangeRates",
+                "tags": ["Đổi thẻ"],
+                "summary": "Phí đổi thẻ theo rank của bạn và tiền nhận được",
+                "responses": {
+                    "200": {
+                        "description": "Bảng phí",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CardExchangeRatesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/card-exchanges": {
+            "get": {
+                "operationId": "listCardExchanges",
+                "tags": ["Đổi thẻ"],
+                "summary": "Thẻ đã gửi qua kết nối này",
+                "description": "Mặc định mới nhất trước. Có `updated_since` thì chỉ thẻ có thay đổi từ lúc đó, thay đổi cũ nhất trước.",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/CardExchangeStatus"
+                        }
+                    },
+                    {
+                        "name": "telco",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "reference",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9_\\-.:]{1,64}$"
+                        }
+                    },
+                    {
+                        "name": "updated_since",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Một trang thẻ",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CardExchangeListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "createCardExchange",
+                "tags": ["Đổi thẻ"],
+                "summary": "Gửi một thẻ để đổi (tiền vào Ví đổi thẻ)",
+                "description": "Cần quyền `card_exchange` và số điện thoại đã xác thực khi shop bắt buộc. Cùng `reference` và cùng thẻ → HTTP 200 với thẻ cũ; cùng `reference`, thẻ khác → 422 `reference_reused`. Kết quả báo qua webhook `card_exchange.updated`.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateCardExchangeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Đã nhận thẻ, đang chờ kết quả",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CardExchangeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Thẻ đã gửi trước đó với cùng reference",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CardExchangeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "423": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/card-exchanges/{id}": {
+            "get": {
+                "operationId": "getCardExchange",
+                "tags": ["Đổi thẻ"],
+                "summary": "Một thẻ",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Thẻ",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CardExchangeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/orders/{code}/warranty-claims": {
+            "post": {
+                "operationId": "createWarrantyClaim",
+                "tags": ["Bảo hành"],
+                "summary": "Gửi yêu cầu bảo hành cho các dòng còn hạn của một đơn",
+                "description": "Cần quyền `warranty`. `item_ids` là `items[].id` của đơn (dòng có `warranty.active` = true). Mỗi đơn một yêu cầu đang mở.",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateWarrantyClaimRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Đã gửi yêu cầu",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WarrantyClaimResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/warranty-claims": {
+            "get": {
+                "operationId": "listWarrantyClaims",
+                "tags": ["Bảo hành"],
+                "summary": "Yêu cầu bảo hành của các đơn đặt qua kết nối này, mới nhất trước",
+                "parameters": [
+                    {
+                        "name": "order_code",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/WarrantyClaimStatus"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Một trang yêu cầu",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WarrantyClaimListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/orders/{code}/items/{item}/queue-priority": {
+            "patch": {
+                "operationId": "changeQueuePriority",
+                "tags": ["Đơn hàng"],
+                "summary": "Đổi phí ưu tiên của một dòng Sò Garena hàng chờ đang chờ",
+                "description": "Cần quyền `orders`. Mỗi 5 tiếng đổi một lần. Tăng thì trừ phần chênh, giảm thì trả lại vào ví đã trả đơn.",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "items[].id của đơn"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChangeQueuePriorityRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Đã đổi",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QueuePriorityResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "402": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/vouchers/check": {
+            "post": {
+                "operationId": "checkVoucher",
+                "tags": ["Đơn hàng"],
+                "summary": "Xem mã giảm giá giảm bao nhiêu cho một gói, trước khi đặt đơn",
+                "description": "Cần quyền `orders`. Không dùng mất lượt của mã. Tối đa 20 lần mỗi phút.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CheckVoucherRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mã dùng được",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VoucherCheckResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/deposits": {
+            "post": {
+                "operationId": "createDeposit",
+                "tags": ["Ví"],
+                "summary": "Lấy thông tin chuyển khoản để nạp Ví mua hàng",
+                "description": "Cần quyền `deposit`. Mỗi tài khoản một mã đang hiện (30 phút): gọi lại trả mã cũ (HTTP 200), hết hạn thì tạo mã mới (HTTP 201). Chuyển khoản với nội dung `transfer_content`; tiền tới trước `credit_until` vẫn được cộng. Khi tiền vào, shop gửi webhook `deposit.completed`.",
+                "responses": {
+                    "201": {
+                        "description": "Mã mới",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DepositResponse"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Mã đang hiện",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DepositResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/deposits/{code}": {
+            "get": {
+                "operationId": "getDeposit",
+                "tags": ["Ví"],
+                "summary": "Một mã nạp kết nối này đã lấy",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Mã nạp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DepositResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        },
+        "/wallet/transfers": {
+            "post": {
+                "operationId": "createWalletTransfer",
+                "tags": ["Ví"],
+                "summary": "Chuyển tiền từ Ví đổi thẻ sang Ví mua hàng",
+                "description": "Cần quyền `wallet_transfer`. Chỉ một chiều. Cùng `Idempotency-Key` và cùng số tiền → HTTP 200 với lần chuyển cũ, không chuyển lần nữa; cùng key, khác số tiền → 422 `idempotency_key_reused`.",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9_\\-.:]{1,64}$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateWalletTransferRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Đã chuyển",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WalletTransferResponse"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Lần chuyển đã làm với cùng key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WalletTransferResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "402": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/Error"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/Error"
+                    }
+                }
+            }
+        }
+    },
+    "webhooks": {
+        "order.updated": {
+            "post": {
+                "summary": "Một đơn của kết nối đổi trạng thái",
+                "description": "Headers: `X-Webhook-Event`, `X-Webhook-Id`, `X-Webhook-Timestamp`, `X-Signature` = `sha256=` + HMAC-SHA256(body, api_key), `X-Signature-V2` = `sha256=` + HMAC-SHA256(timestamp + \".\" + body, api_key). Trả 2xx trong 15 giây.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OrderWebhook"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Đã nhận"
+                    }
+                }
+            }
+        },
+        "webhook.test": {
+            "post": {
+                "summary": "Webhook thử từ trang Kết nối API",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestWebhook"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Đã nhận"
+                    }
+                }
+            }
+        },
+        "card_exchange.updated": {
+            "post": {
+                "summary": "Một thẻ của kết nối có kết quả",
+                "description": "Cùng header và chữ ký như `order.updated`. Không bao giờ có mã thẻ.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CardExchangeWebhook"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Đã nhận"
+                    }
+                }
+            }
+        },
+        "deposit.completed": {
+            "post": {
+                "summary": "Tiền của một mã nạp kết nối này đã lấy đã vào Ví mua hàng",
+                "description": "Cùng header và chữ ký như `order.updated`.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DepositWebhook"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Đã nhận"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "bearer": {
+                "type": "http",
+                "scheme": "bearer"
+            }
+        },
+        "responses": {
+            "Error": {
+                "description": "Lỗi: xem `error.code`",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "schemas": {
+            "ErrorResponse": {
+                "type": "object",
+                "required": ["error"],
+                "properties": {
+                    "error": {
+                        "type": "object",
+                        "required": ["code", "message"],
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "description": "missing_api_key, invalid_api_key, wrong_connection_type, connection_locked, connection_disabled, account_blocked, ip_not_allowed, scope_not_granted, maintenance, not_found, method_not_allowed, rate_limited, server_error, validation_failed, idempotency_key_required, idempotency_key_reused, request_in_progress, product_not_found, package_not_found, order_not_found, event_not_found, package_unavailable, product_unavailable, price_changed, quantity_too_large, invalid_fields, invalid_queue, voucher_refused, insufficient_balance, order_refused, phone_verification_required, reference_reused, card_not_found, telco_unavailable, value_invalid, value_unavailable, invalid_card_format, card_already_submitted, card_exchange_locked, too_many_pending, warranty_claim_open, warranty_expired, warranty_item_invalid, item_not_found, priority_not_changeable, priority_change_too_soon, priority_unchanged, deposit_unavailable, deposit_not_found"
+                            },
+                            "message": {
+                                "type": "string"
+                            },
+                            "fields": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "field_id": {
+                                "type": "integer"
+                            },
+                            "max": {
+                                "type": "integer"
+                            },
+                            "required": {
+                                "type": "integer"
+                            },
+                            "balance": {
+                                "type": "integer"
+                            },
+                            "price": {
+                                "type": "integer"
+                            },
+                            "order_code": {
+                                "type": "string"
+                            },
+                            "scope": {
+                                "type": "string"
+                            },
+                            "ip": {
+                                "type": "string"
+                            },
+                            "card_id": {
+                                "type": "string"
+                            },
+                            "locked_until": {
+                                "type": ["string", "null"],
+                                "format": "date-time"
+                            },
+                            "claim_id": {
+                                "type": "integer"
+                            },
+                            "next_change_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        }
+                    }
+                }
+            },
+            "AccountResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/Account"
+                    }
+                }
+            },
+            "Account": {
+                "type": "object",
+                "required": [
+                    "balance",
+                    "exchange_balance",
+                    "currency",
+                    "rank",
+                    "exchange_rank",
+                    "scopes",
+                    "limits"
+                ],
+                "properties": {
+                    "balance": {
+                        "type": "integer",
+                        "description": "Ví mua hàng"
+                    },
+                    "exchange_balance": {
+                        "type": "integer",
+                        "description": "Ví đổi thẻ"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "enum": ["VND"]
+                    },
+                    "rank": {
+                        "type": ["string", "null"]
+                    },
+                    "exchange_rank": {
+                        "type": "string",
+                        "description": "Rank đổi thẻ"
+                    },
+                    "scopes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "orders",
+                                "card_exchange",
+                                "warranty",
+                                "deposit",
+                                "wallet_transfer"
+                            ]
+                        }
+                    },
+                    "limits": {
+                        "type": "object",
+                        "required": [
+                            "max_cards_per_order",
+                            "max_game_quantity"
+                        ],
+                        "properties": {
+                            "max_cards_per_order": {
+                                "type": "integer"
+                            },
+                            "max_game_quantity": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                }
+            },
+            "ProductListResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Product"
+                        }
+                    }
+                }
+            },
+            "ProductResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/Product"
+                    }
+                }
+            },
+            "ProductType": {
+                "type": "string",
+                "enum": ["game", "card", "garena_queue"]
+            },
+            "Product": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "type",
+                    "name",
+                    "slug",
+                    "image_url",
+                    "card_type",
+                    "purchase_notice",
+                    "fields",
+                    "packages",
+                    "queue"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "type": {
+                        "$ref": "#/components/schemas/ProductType"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "image_url": {
+                        "type": ["string", "null"]
+                    },
+                    "card_type": {
+                        "type": ["string", "null"]
+                    },
+                    "purchase_notice": {
+                        "type": ["string", "null"]
+                    },
+                    "fields": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProductField"
+                        }
+                    },
+                    "packages": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Package"
+                        }
+                    },
+                    "queue": {
+                        "type": ["object", "null"],
+                        "required": [
+                            "max_priority_percent",
+                            "top_percent",
+                            "waiting"
+                        ],
+                        "properties": {
+                            "max_priority_percent": {
+                                "type": "integer"
+                            },
+                            "top_percent": {
+                                "type": "integer"
+                            },
+                            "waiting": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                }
+            },
+            "ProductField": {
+                "type": "object",
+                "required": ["id", "label", "type", "required", "options"],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["text", "password", "select"]
+                    },
+                    "required": {
+                        "type": "boolean"
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["value", "label"],
+                            "properties": {
+                                "value": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Package": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "price",
+                    "list_price",
+                    "face_value",
+                    "so_amount",
+                    "in_stock"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "integer",
+                        "description": "Giá theo rank của bạn"
+                    },
+                    "list_price": {
+                        "type": "integer"
+                    },
+                    "face_value": {
+                        "type": ["integer", "null"]
+                    },
+                    "so_amount": {
+                        "type": ["integer", "null"]
+                    },
+                    "in_stock": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "CreateOrderRequest": {
+                "type": "object",
+                "required": ["package_id"],
+                "properties": {
+                    "package_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 1
+                    },
+                    "fields": {
+                        "type": "object",
+                        "description": "{ id ô: giá trị }",
+                        "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 200
+                        }
+                    },
+                    "voucher_code": {
+                        "type": "string",
+                        "maxLength": 40
+                    },
+                    "queue": {
+                        "type": "object",
+                        "description": "Chỉ cho Sò Garena hàng chờ",
+                        "properties": {
+                            "account": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 64,
+                                "pattern": "^[A-Za-z0-9._@-]+$"
+                            },
+                            "priority_percent": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10
+                            },
+                            "top": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            },
+            "OrderStatus": {
+                "type": "string",
+                "enum": [
+                    "awaiting_payment",
+                    "pending",
+                    "processing",
+                    "completed",
+                    "partial",
+                    "refunded",
+                    "cancelled"
+                ]
+            },
+            "OrderResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/Order"
+                    }
+                }
+            },
+            "OrderListResponse": {
+                "type": "object",
+                "required": ["data", "meta"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Order"
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/PageMeta"
+                    }
+                }
+            },
+            "PageMeta": {
+                "type": "object",
+                "required": ["page", "per_page", "total", "last_page"],
+                "properties": {
+                    "page": {
+                        "type": "integer"
+                    },
+                    "per_page": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "last_page": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "Order": {
+                "type": "object",
+                "required": [
+                    "code",
+                    "reference",
+                    "status",
+                    "product",
+                    "package",
+                    "quantity",
+                    "unit_price",
+                    "list_price",
+                    "total",
+                    "voucher",
+                    "fields",
+                    "items",
+                    "cards",
+                    "note",
+                    "delivery",
+                    "created_at",
+                    "updated_at",
+                    "completed_at"
+                ],
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": ["string", "null"],
+                        "description": "Idempotency-Key lúc đặt"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/OrderStatus"
+                    },
+                    "product": {
+                        "type": ["object", "null"],
+                        "required": ["id", "name", "type"],
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "$ref": "#/components/schemas/ProductType"
+                            }
+                        }
+                    },
+                    "package": {
+                        "type": ["object", "null"],
+                        "required": ["id", "name"],
+                        "properties": {
+                            "id": {
+                                "type": ["integer", "null"]
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "unit_price": {
+                        "type": ["integer", "null"]
+                    },
+                    "list_price": {
+                        "type": ["integer", "null"]
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "voucher": {
+                        "type": ["object", "null"],
+                        "required": ["code", "discount"],
+                        "properties": {
+                            "code": {
+                                "type": "string"
+                            },
+                            "discount": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "fields": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["id", "label", "value"],
+                            "properties": {
+                                "id": {
+                                    "type": ["integer", "null"]
+                                },
+                                "label": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OrderItem"
+                        }
+                    },
+                    "cards": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Card"
+                        }
+                    },
+                    "note": {
+                        "type": ["string", "null"]
+                    },
+                    "delivery": {
+                        "type": ["string", "null"]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "completed_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    }
+                }
+            },
+            "OrderItem": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "status",
+                    "note",
+                    "cards",
+                    "queue",
+                    "warranty"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/OrderStatus"
+                    },
+                    "note": {
+                        "type": ["string", "null"]
+                    },
+                    "cards": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Card"
+                        }
+                    },
+                    "queue": {
+                        "type": ["object", "null"],
+                        "required": [
+                            "account",
+                            "so_target",
+                            "so_received",
+                            "priority_percent",
+                            "priority_fee",
+                            "status",
+                            "message",
+                            "position",
+                            "refunded"
+                        ],
+                        "properties": {
+                            "account": {
+                                "type": "string"
+                            },
+                            "so_target": {
+                                "type": "integer"
+                            },
+                            "so_received": {
+                                "type": "integer"
+                            },
+                            "priority_percent": {
+                                "type": "integer"
+                            },
+                            "priority_fee": {
+                                "type": "integer"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": ["waiting", "paused", "done", "closed"]
+                            },
+                            "message": {
+                                "type": ["string", "null"]
+                            },
+                            "position": {
+                                "type": ["integer", "null"]
+                            },
+                            "refunded": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "warranty": {
+                        "type": ["object", "null"],
+                        "required": ["days", "ends_at", "lifetime", "active"],
+                        "properties": {
+                            "days": {
+                                "type": "integer"
+                            },
+                            "ends_at": {
+                                "type": ["string", "null"],
+                                "format": "date-time"
+                            },
+                            "lifetime": {
+                                "type": "boolean"
+                            },
+                            "active": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            },
+            "Card": {
+                "type": "object",
+                "required": ["serial", "code"],
+                "properties": {
+                    "serial": {
+                        "type": ["string", "null"]
+                    },
+                    "code": {
+                        "type": "string"
+                    }
+                }
+            },
+            "EventListResponse": {
+                "type": "object",
+                "required": ["data", "meta"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Event"
+                        }
+                    },
+                    "meta": {
+                        "type": "object",
+                        "required": ["has_more"],
+                        "properties": {
+                            "has_more": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            },
+            "Event": {
+                "type": "object",
+                "required": [
+                    "event_id",
+                    "event",
+                    "created_at",
+                    "delivery",
+                    "data"
+                ],
+                "properties": {
+                    "event_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "event": {
+                        "type": "string",
+                        "enum": [
+                            "order.updated",
+                            "card_exchange.updated",
+                            "deposit.completed",
+                            "webhook.test"
+                        ]
+                    },
+                    "created_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "delivery": {
+                        "type": "object",
+                        "required": [
+                            "state",
+                            "attempts",
+                            "last_status",
+                            "delivered_at"
+                        ],
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": ["delivered", "failed", "pending"]
+                            },
+                            "attempts": {
+                                "type": "integer"
+                            },
+                            "last_status": {
+                                "type": ["integer", "null"]
+                            },
+                            "delivered_at": {
+                                "type": ["string", "null"],
+                                "format": "date-time"
+                            }
+                        }
+                    },
+                    "data": {
+                        "type": ["object", "null"],
+                        "description": "Đơn, thẻ hoặc mã nạp như hiện tại, hoặc { partner_id, message } (webhook.test)"
+                    }
+                }
+            },
+            "OrderWebhook": {
+                "type": "object",
+                "required": ["event", "event_id", "created_at", "data"],
+                "properties": {
+                    "event": {
+                        "type": "string",
+                        "enum": ["order.updated"]
+                    },
+                    "event_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/Order"
+                    }
+                }
+            },
+            "TestWebhook": {
+                "type": "object",
+                "required": ["event", "event_id", "created_at", "data"],
+                "properties": {
+                    "event": {
+                        "type": "string",
+                        "enum": ["webhook.test"]
+                    },
+                    "event_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "data": {
+                        "type": "object",
+                        "required": ["partner_id", "message"],
+                        "properties": {
+                            "partner_id": {
+                                "type": "string"
+                            },
+                            "message": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "Wallet": {
+                "type": "string",
+                "enum": ["main", "exchange"],
+                "description": "main: Ví mua hàng, exchange: Ví đổi thẻ"
+            },
+            "Transaction": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "wallet",
+                    "wallet_label",
+                    "amount",
+                    "balance_after",
+                    "description",
+                    "via_api",
+                    "created_at"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "purchase, refund, deposit, card_topup, card_exchange, wallet_transfer, withdrawal, withdrawal_refund, admin_credit, admin_debit, external_payment"
+                    },
+                    "wallet": {
+                        "$ref": "#/components/schemas/Wallet"
+                    },
+                    "wallet_label": {
+                        "type": "string"
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "description": "Dương: cộng, âm: trừ"
+                    },
+                    "balance_after": {
+                        "type": "integer"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "via_api": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "TransactionListResponse": {
+                "type": "object",
+                "required": ["data", "meta"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Transaction"
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/PageMeta"
+                    }
+                }
+            },
+            "CardExchangeStatus": {
+                "type": "string",
+                "enum": [
+                    "pending",
+                    "success",
+                    "wrong_value",
+                    "invalid",
+                    "failed"
+                ],
+                "description": "pending: chờ; success: thẻ đúng; wrong_value: thẻ đúng, sai mệnh giá; invalid: thẻ sai; failed: gửi lỗi, không cộng tiền"
+            },
+            "CreateCardExchangeRequest": {
+                "type": "object",
+                "required": ["telco", "value", "serial", "code", "reference"],
+                "properties": {
+                    "telco": {
+                        "type": "string",
+                        "description": "VIETTEL, VINAPHONE, MOBIFONE, VIETNAMOBILE, ZING, GARENA, GATE, VCOIN, APPOTA, CAROT"
+                    },
+                    "value": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Mệnh giá khai báo"
+                    },
+                    "serial": {
+                        "type": "string",
+                        "maxLength": 30
+                    },
+                    "code": {
+                        "type": "string",
+                        "maxLength": 30
+                    },
+                    "reference": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_\\-.:]{1,64}$",
+                        "description": "Mã của bạn cho thẻ này, duy nhất trên kết nối"
+                    }
+                }
+            },
+            "CardExchange": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "reference",
+                    "status",
+                    "telco",
+                    "serial",
+                    "declared_value",
+                    "value",
+                    "fee_percent",
+                    "wrong_value_penalty",
+                    "amount",
+                    "message",
+                    "created_at",
+                    "updated_at",
+                    "completed_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "reference": {
+                        "type": ["string", "null"]
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/CardExchangeStatus"
+                    },
+                    "telco": {
+                        "type": "string"
+                    },
+                    "serial": {
+                        "type": "string"
+                    },
+                    "declared_value": {
+                        "type": "integer"
+                    },
+                    "value": {
+                        "type": ["integer", "null"],
+                        "description": "Mệnh giá thật (null khi chờ)"
+                    },
+                    "fee_percent": {
+                        "type": "number"
+                    },
+                    "wrong_value_penalty": {
+                        "type": ["integer", "null"]
+                    },
+                    "amount": {
+                        "type": ["integer", "null"],
+                        "description": "Tiền cộng Ví đổi thẻ (null khi chờ)"
+                    },
+                    "message": {
+                        "type": ["string", "null"]
+                    },
+                    "created_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "completed_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    }
+                }
+            },
+            "CardExchangeResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/CardExchange"
+                    }
+                }
+            },
+            "CardExchangeListResponse": {
+                "type": "object",
+                "required": ["data", "meta"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CardExchange"
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/PageMeta"
+                    }
+                }
+            },
+            "CardExchangeRatesResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": ["wrong_value_penalty", "rates"],
+                        "properties": {
+                            "wrong_value_penalty": {
+                                "type": "integer",
+                                "description": "% trừ khi thẻ sai mệnh giá"
+                            },
+                            "rates": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "required": [
+                                        "telco",
+                                        "value",
+                                        "fee_percent",
+                                        "receive_amount"
+                                    ],
+                                    "properties": {
+                                        "telco": {
+                                            "type": "string"
+                                        },
+                                        "value": {
+                                            "type": "integer"
+                                        },
+                                        "fee_percent": {
+                                            "type": "number"
+                                        },
+                                        "receive_amount": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "CardExchangeWebhook": {
+                "type": "object",
+                "required": ["event", "event_id", "created_at", "data"],
+                "properties": {
+                    "event": {
+                        "type": "string",
+                        "enum": ["card_exchange.updated"]
+                    },
+                    "event_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/CardExchange"
+                    }
+                }
+            },
+            "WarrantyClaimStatus": {
+                "type": "string",
+                "enum": ["pending", "processing", "resolved", "rejected"],
+                "description": "pending: chờ duyệt; processing: đang bảo hành; resolved: đã bảo hành; rejected: từ chối"
+            },
+            "CreateWarrantyClaimRequest": {
+                "type": "object",
+                "required": ["item_ids", "zalo_phone"],
+                "properties": {
+                    "item_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "zalo_phone": {
+                        "type": "string",
+                        "description": "Số di động Việt Nam, ví dụ 0912345678"
+                    },
+                    "note": {
+                        "type": "string",
+                        "maxLength": 1000
+                    }
+                }
+            },
+            "WarrantyClaim": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "order_code",
+                    "status",
+                    "items",
+                    "zalo_phone",
+                    "note",
+                    "reply",
+                    "created_at",
+                    "closed_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "order_code": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/WarrantyClaimStatus"
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["id", "name"],
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "name": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "zalo_phone": {
+                        "type": "string"
+                    },
+                    "note": {
+                        "type": ["string", "null"]
+                    },
+                    "reply": {
+                        "type": ["string", "null"],
+                        "description": "Lời nhắn của shop khi xử lý xong"
+                    },
+                    "created_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "closed_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    }
+                }
+            },
+            "WarrantyClaimResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/WarrantyClaim"
+                    }
+                }
+            },
+            "WarrantyClaimListResponse": {
+                "type": "object",
+                "required": ["data", "meta"],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/WarrantyClaim"
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/PageMeta"
+                    }
+                }
+            },
+            "ChangeQueuePriorityRequest": {
+                "type": "object",
+                "properties": {
+                    "priority_percent": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10
+                    },
+                    "top": {
+                        "type": "boolean",
+                        "description": "true: \"Top 1\", cao hơn phí cao nhất đang chờ một bậc"
+                    }
+                }
+            },
+            "QueuePriorityResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": ["difference", "order"],
+                        "properties": {
+                            "difference": {
+                                "type": "integer",
+                                "description": "Dương: đã trừ thêm; âm: đã trả lại"
+                            },
+                            "order": {
+                                "$ref": "#/components/schemas/Order"
+                            }
+                        }
+                    }
+                }
+            },
+            "CheckVoucherRequest": {
+                "type": "object",
+                "required": ["package_id", "voucher_code"],
+                "properties": {
+                    "package_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 1
+                    },
+                    "voucher_code": {
+                        "type": "string",
+                        "maxLength": 40
+                    }
+                }
+            },
+            "VoucherCheckResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "code",
+                            "name",
+                            "subtotal",
+                            "discount",
+                            "total"
+                        ],
+                        "properties": {
+                            "code": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": ["string", "null"]
+                            },
+                            "subtotal": {
+                                "type": "integer"
+                            },
+                            "discount": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                }
+            },
+            "Deposit": {
+                "type": "object",
+                "required": [
+                    "code",
+                    "transfer_content",
+                    "status",
+                    "paid_amount",
+                    "min_amount",
+                    "max_amount",
+                    "expires_at",
+                    "credit_until",
+                    "created_at",
+                    "completed_at",
+                    "accounts"
+                ],
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "transfer_content": {
+                        "type": "string",
+                        "description": "Nội dung chuyển khoản, giữ nguyên"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "expired", "completed"],
+                        "description": "expired: không còn hiện, tiền tới trước credit_until vẫn được cộng"
+                    },
+                    "paid_amount": {
+                        "type": ["integer", "null"]
+                    },
+                    "min_amount": {
+                        "type": "integer"
+                    },
+                    "max_amount": {
+                        "type": "integer"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "credit_until": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "created_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "completed_at": {
+                        "type": ["string", "null"],
+                        "format": "date-time"
+                    },
+                    "accounts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "bank",
+                                "bank_label",
+                                "bin",
+                                "account_number",
+                                "account_name",
+                                "label",
+                                "logo_url"
+                            ],
+                            "properties": {
+                                "bank": {
+                                    "type": "string"
+                                },
+                                "bank_label": {
+                                    "type": "string"
+                                },
+                                "bin": {
+                                    "type": "string",
+                                    "description": "Mã BIN để dựng VietQR"
+                                },
+                                "account_number": {
+                                    "type": "string"
+                                },
+                                "account_name": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "type": ["string", "null"]
+                                },
+                                "logo_url": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "DepositResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/Deposit"
+                    }
+                }
+            },
+            "CreateWalletTransferRequest": {
+                "type": "object",
+                "required": ["amount"],
+                "properties": {
+                    "amount": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "description": "Số tiền chuyển (VND)"
+                    }
+                }
+            },
+            "WalletTransferResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "reference",
+                            "amount",
+                            "balance",
+                            "exchange_balance",
+                            "created_at"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "reference": {
+                                "type": "string",
+                                "description": "Idempotency-Key"
+                            },
+                            "amount": {
+                                "type": "integer"
+                            },
+                            "balance": {
+                                "type": "integer",
+                                "description": "Ví mua hàng lúc này"
+                            },
+                            "exchange_balance": {
+                                "type": "integer",
+                                "description": "Ví đổi thẻ lúc này"
+                            },
+                            "created_at": {
+                                "type": ["string", "null"],
+                                "format": "date-time"
+                            }
+                        }
+                    }
+                }
+            },
+            "DepositWebhook": {
+                "type": "object",
+                "required": ["event", "event_id", "created_at", "data"],
+                "properties": {
+                    "event": {
+                        "type": "string",
+                        "enum": ["deposit.completed"]
+                    },
+                    "event_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/Deposit"
+                    }
+                }
+            }
+        }
+    }
+}
