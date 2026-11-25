@@ -13,7 +13,8 @@ declare(strict_types=1);
  * `php bin/generate-models.php`, thêm method vào service nếu có endpoint mới, rồi chạy test.
  */
 
-$arguments = array_slice($argv, 1);
+// $_SERVER['argv'], not $argv: $argv only exists when register_argc_argv is on.
+$arguments = array_map('strval', array_slice(is_array($_SERVER['argv'] ?? null) ? $_SERVER['argv'] : [], 1));
 $update = in_array('--update', $arguments, true);
 $arguments = array_values(array_filter($arguments, static fn (string $argument): bool => $argument !== '--update'));
 $url = $arguments[0] ?? 'https://card2k.net/tai-lieu-api/openapi';
