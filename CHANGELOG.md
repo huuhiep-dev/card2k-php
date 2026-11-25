@@ -4,7 +4,7 @@ Theo [Semantic Versioning](https://semver.org/lang/vi/). Trước 1.0.0, bản M
 
 ## [Chưa phát hành]
 
-## 0.1.0
+## 0.1.0 (2026-11-26)
 
 Bản đầu tiên, đủ mọi endpoint của API v3 (spec 3.1.0):
 
