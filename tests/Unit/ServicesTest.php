@@ -47,7 +47,7 @@ final class ServicesTest extends TestCase
             'GET /me' => ['/me', fn (Client $c) => $c->account->get(), '/api/v3/me', null, [], Account::class],
             'GET /products' => ['/products', fn (Client $c) => $c->products->list('card'), '/api/v3/products?type=card', null, [], Product::class],
             'GET /products/{id}' => ['/products/{id}', fn (Client $c) => $c->products->get(7), '/api/v3/products/7', null, [], Product::class],
-            'GET /orders' => ['/orders', fn (Client $c) => $c->orders->list(['status' => 'completed', 'updated_since' => $since, 'per_page' => 50]), '/api/v3/orders?status=completed&updated_since=2026-11-20T08%3A00%3A00%2B07%3A00&per_page=50', null, [], Order::class],
+            'GET /orders' => ['/orders', fn (Client $c) => $c->orders->list(['status' => 'completed', 'updated_since' => $since, 'per_page' => 50]), '/api/v3/orders?status=completed&updated_since=2026-11-20T01%3A00%3A00Z&per_page=50', null, [], Order::class],
             'POST /orders' => ['/orders', fn (Client $c) => $c->orders->create(['package_id' => 12, 'quantity' => 2, 'fields' => [3 => '123456789'], 'voucher_code' => 'GIAM10'], 'DON-1001'), '/api/v3/orders', ['package_id' => 12, 'quantity' => 2, 'fields' => ['3' => '123456789'], 'voucher_code' => 'GIAM10'], ['Idempotency-Key' => 'DON-1001'], Order::class],
             'GET /orders/{code}' => ['/orders/{code}', fn (Client $c) => $c->orders->get('DH 1/2'), '/api/v3/orders/DH%201%2F2', null, [], Order::class],
             'GET /events' => ['/events', fn (Client $c) => $c->events->list('9b2f6a4e-3c1d-4f8a-9e7b-1a2b3c4d5e6f', 10), '/api/v3/events?after=9b2f6a4e-3c1d-4f8a-9e7b-1a2b3c4d5e6f&limit=10', null, [], EventPage::class],
@@ -170,6 +170,21 @@ final class ServicesTest extends TestCase
             self::assertMatchesRegularExpression('/^[A-Za-z0-9_\-.:]{1,64}$/', $key);
         }
         self::assertNotSame($orderKey, $walletKey);
+    }
+
+    public function test_dates_are_sent_in_utc_and_strings_as_given(): void
+    {
+        $this->http->json(200, ['data' => [], 'meta' => []])->json(200, ['data' => [], 'meta' => []]);
+        $client = $this->client();
+
+        $client->transactions->list([
+            'from' => new \DateTime('2026-11-25 07:30:00', new DateTimeZone('Asia/Ho_Chi_Minh')),
+            'to' => new DateTimeImmutable('2026-11-25 23:59:59', new DateTimeZone('UTC')),
+        ]);
+        self::assertStringEndsWith('?from=2026-11-25T00%3A30%3A00Z&to=2026-11-25T23%3A59%3A59Z', (string) $this->http->last()->getUri());
+
+        $client->cardExchanges->list(['updated_since' => '2026-11-25T10:00:00+07:00']);
+        self::assertStringEndsWith('?updated_since=2026-11-25T10%3A00%3A00%2B07%3A00', (string) $this->http->last()->getUri());
     }
 
     public function test_find_card_by_reference(): void

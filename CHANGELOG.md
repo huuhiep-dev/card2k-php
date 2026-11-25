@@ -15,3 +15,4 @@ Bản đầu tiên, đủ mọi endpoint của API v3 (spec 3.1.0):
 - Sự kiện webhook: đọc lại, kiểm chữ ký `X-Signature-V2` có chống gửi lại.
 - Tự thử lại khi lỗi mạng / 429 / 5xx / `request_in_progress`, cùng Idempotency-Key.
 - Lỗi theo `error.code`, mỗi mã HTTP một lớp exception.
+- Mốc thời gian lọc (`updated_since`, `from`, `to`) truyền bằng `DateTimeInterface` được gửi dạng UTC (`…Z`), nên lọc đúng cả với shop bản trước v2.20.2 (bản đó so mốc `+07:00` lệch 7 tiếng).
