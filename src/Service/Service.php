@@ -7,7 +7,9 @@ namespace Card2K\Service;
 use Card2K\Http\Transport;
 use Card2K\Model\Model;
 use Card2K\Page;
+use DateTimeImmutable;
 use DateTimeInterface;
+use DateTimeZone;
 use Generator;
 
 /**
@@ -103,12 +105,18 @@ abstract class Service
     }
 
     /**
-     * Thời điểm dạng ISO 8601 cho tham số lọc.
+     * Thời điểm cho tham số lọc: `DateTimeInterface` đổi sang UTC (`2026-11-25T03:00:00Z`), chuỗi
+     * gửi nguyên văn.
+     *
+     * Gửi UTC vì shop trước v2.20.2 so mốc có múi khác UTC (ví dụ `+07:00`) lệch 7 tiếng; UTC
+     * thì đúng với mọi bản.
      */
     protected static function time(mixed $value): ?string
     {
         if ($value instanceof DateTimeInterface) {
-            return $value->format(DateTimeInterface::ATOM);
+            return DateTimeImmutable::createFromInterface($value)
+                ->setTimezone(new DateTimeZone('UTC'))
+                ->format('Y-m-d\TH:i:s\Z');
         }
 
         return is_string($value) ? $value : null;
