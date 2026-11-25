@@ -17,8 +17,7 @@ use Card2K\Service\WalletService;
 use Card2K\Service\WarrantyClaimService;
 use Closure;
 use GuzzleHttp\Client as GuzzleClient;
-use Http\Discovery\Psr17FactoryDiscovery;
-use Http\Discovery\Psr18ClientDiscovery;
+use GuzzleHttp\Psr7\HttpFactory;
 use InvalidArgumentException;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -38,7 +37,7 @@ use Psr\Log\LoggerInterface;
  */
 final class Client
 {
-    public const VERSION = '0.3.0';
+    public const VERSION = '0.3.1';
 
     /** Biến môi trường chứa key, đọc khi không truyền key vào. */
     public const ENV_KEY = 'CARD2K_API_KEY';
@@ -71,7 +70,7 @@ final class Client
      * @param  string|null  $apiKey  key của kết nối loại "API v3" (Tài khoản → Kết nối API); bỏ trống thì đọc biến môi trường `CARD2K_API_KEY`
      * @param  array{base_url?: string, http_client?: ClientInterface, request_factory?: RequestFactoryInterface, stream_factory?: StreamFactoryInterface, timeout?: float|int, max_retries?: int, max_retry_delay?: float|int, sleep?: callable(float): void, user_agent?: string, logger?: LoggerInterface|null}  $options
      *   - `base_url`: tên miền của shop, mặc định https://card2k.net (bắt buộc https, trừ localhost)
-     *   - `http_client`: client PSR-18 của bạn; bỏ trống thì SDK dùng Guzzle nếu có, không thì tự tìm (Symfony…)
+     *   - `http_client`: client PSR-18 của bạn (kèm `request_factory`, `stream_factory` nếu không dùng Guzzle); bỏ trống thì SDK dùng Guzzle cài kèm
      *   - `timeout`: số giây chờ mỗi request khi SDK tự tạo Guzzle, mặc định 30 (kết nối tối đa 10 giây)
      *   - `max_retries`: số lần thử lại khi lỗi mạng / 429 / 5xx, mặc định 2
      *   - `max_retry_delay`: chờ tối đa bao nhiêu giây trước một lần thử lại, mặc định 20
@@ -103,8 +102,8 @@ final class Client
             $apiKey,
             self::apiUrl($options['base_url'] ?? self::DEFAULT_BASE_URL),
             $options['http_client'] ?? self::defaultHttpClient((float) ($options['timeout'] ?? 30)),
-            $options['request_factory'] ?? Psr17FactoryDiscovery::findRequestFactory(),
-            $options['stream_factory'] ?? Psr17FactoryDiscovery::findStreamFactory(),
+            $options['request_factory'] ?? new HttpFactory(),
+            $options['stream_factory'] ?? new HttpFactory(),
             $maxRetries,
             (float) ($options['max_retry_delay'] ?? 20),
             Closure::fromCallable($sleep),
@@ -200,15 +199,11 @@ final class Client
     }
 
     /**
-     * Guzzle có thời gian chờ (Guzzle mặc định chờ mãi), không có Guzzle thì tự tìm client PSR-18.
+     * Guzzle (cài kèm SDK) có thời gian chờ: Guzzle mặc định chờ mãi.
      */
     private static function defaultHttpClient(float $timeout): ClientInterface
     {
-        if (class_exists(GuzzleClient::class)) {
-            return new GuzzleClient(['timeout' => $timeout, 'connect_timeout' => min(10.0, $timeout)]);
-        }
-
-        return Psr18ClientDiscovery::find();
+        return new GuzzleClient(['timeout' => $timeout, 'connect_timeout' => min(10.0, $timeout)]);
     }
 
     /**
