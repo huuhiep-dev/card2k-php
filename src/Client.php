@@ -30,15 +30,18 @@ use Psr\Log\LoggerInterface;
  * Client của API v3.
  *
  * ```php
- * $card2k = new Card2K\Client(getenv('CARD2K_API_KEY'));
- * $order = $card2k->orders->create(['package_id' => 12, 'fields' => [3 => '123456789']], 'DON-1001');
+ * $card2k = new Card2K\Client(); // key từ biến môi trường CARD2K_API_KEY
+ * $order = $card2k->orders->create(['package_id' => 216, 'fields' => [7 => '123456789']], 'DON-1001');
  * ```
  *
  * Giữ key ở máy chủ của bạn (biến môi trường), không đưa vào trình duyệt / app, không ghi log.
  */
 final class Client
 {
-    public const VERSION = '0.2.1';
+    public const VERSION = '0.3.0';
+
+    /** Biến môi trường chứa key, đọc khi không truyền key vào. */
+    public const ENV_KEY = 'CARD2K_API_KEY';
 
     public const DEFAULT_BASE_URL = 'https://card2k.net';
 
@@ -65,7 +68,7 @@ final class Client
     private readonly Transport $transport;
 
     /**
-     * @param  string  $apiKey  key của kết nối loại "API v3" (Tài khoản → Kết nối API)
+     * @param  string|null  $apiKey  key của kết nối loại "API v3" (Tài khoản → Kết nối API); bỏ trống thì đọc biến môi trường `CARD2K_API_KEY`
      * @param  array{base_url?: string, http_client?: ClientInterface, request_factory?: RequestFactoryInterface, stream_factory?: StreamFactoryInterface, timeout?: float|int, max_retries?: int, max_retry_delay?: float|int, sleep?: callable(float): void, user_agent?: string, logger?: LoggerInterface|null}  $options
      *   - `base_url`: tên miền của shop, mặc định https://card2k.net (bắt buộc https, trừ localhost)
      *   - `http_client`: client PSR-18 của bạn; bỏ trống thì SDK dùng Guzzle nếu có, không thì tự tìm (Symfony…)
@@ -75,11 +78,11 @@ final class Client
      *   - `user_agent`: thêm vào sau User-Agent của SDK, ví dụ tên hệ thống của bạn
      *   - `logger`: logger PSR-3: mỗi lần gọi ghi phương thức, đường dẫn, mã HTTP, thời gian, X-Request-Id (không ghi key, body, mã thẻ)
      */
-    public function __construct(string $apiKey, array $options = [])
+    public function __construct(?string $apiKey = null, array $options = [])
     {
-        $apiKey = trim($apiKey);
+        $apiKey = trim($apiKey ?? self::keyFromEnvironment());
         if ($apiKey === '') {
-            throw new InvalidArgumentException('Thiếu API key (Tài khoản → Kết nối API, loại API v3).');
+            throw new InvalidArgumentException('Thiếu API key: đặt biến môi trường '.self::ENV_KEY.' hoặc truyền vào new Card2K\Client($key) (key của kết nối API v3, Tài khoản → Kết nối API).');
         }
 
         $maxRetries = $options['max_retries'] ?? 2;
@@ -180,6 +183,20 @@ final class Client
     public function lastResponse(): ?ResponseInterface
     {
         return $this->transport->lastResponse();
+    }
+
+    /**
+     * `CARD2K_API_KEY` từ `$_ENV`, `$_SERVER` (nơi phpdotenv ghi) hoặc `getenv()`; rỗng nếu không có.
+     */
+    private static function keyFromEnvironment(): string
+    {
+        foreach ([$_ENV[self::ENV_KEY] ?? null, $_SERVER[self::ENV_KEY] ?? null, getenv(self::ENV_KEY)] as $value) {
+            if (is_string($value) && trim($value) !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     /**
