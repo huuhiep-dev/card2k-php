@@ -4,6 +4,10 @@ Theo [Semantic Versioning](https://semver.org/lang/vi/). Trước 1.0.0, bản M
 
 ## [Chưa phát hành]
 
+## 0.3.1 (2026-11-26)
+
+- **Sửa**: dự án PHP chưa có thư viện HTTP mà cài SDK theo README thì `new Card2K\Client()` báo lỗi "No PSR-18 clients found". Guzzle giờ là thư viện bắt buộc, cài kèm tự động; bỏ `php-http/discovery`. Truyền `http_client` của riêng bạn vẫn dùng được.
+
 ## 0.3.0 (2026-11-26)
 
 - `new Card2K\Client()` không cần truyền key: SDK tự đọc biến môi trường `CARD2K_API_KEY` (`$_ENV`, `$_SERVER`, `getenv()`). Truyền key vẫn chạy như cũ và được ưu tiên.

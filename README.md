@@ -53,7 +53,7 @@ $order = $card2k->orders->create(['package_id' => 216, 'fields' => [7 => '123456
 composer require card2k/card2k-php
 ```
 
-Cần PHP 8.1+ và một thư viện HTTP chuẩn PSR-18: có Guzzle (Laravel có sẵn) thì SDK dùng Guzzle, không thì tự tìm (Symfony HttpClient…).
+Cần PHP 8.1+. Guzzle được cài kèm (Laravel vốn có sẵn), không phải cài thêm gì.
 
 ## Bắt đầu nhanh
 
@@ -517,7 +517,7 @@ $card2k = new Card2K\Client(options: [ // key vẫn từ CARD2K_API_KEY; hoặc 
     'max_retry_delay' => 10,      // Retry-After lâu hơn thì ném lỗi luôn (mặc định 20 giây)
     'user_agent' => 'shop-cua-toi/2.1',
     'logger' => $psr3Logger,      // ghi mỗi lần gọi: phương thức, đường dẫn, mã HTTP, thời gian, X-Request-Id
-    'http_client' => $psr18Client, // client HTTP của bạn (proxy…), thay cho Guzzle SDK tự tạo
+    'http_client' => $psr18Client, // client HTTP (PSR-18) của bạn (proxy…), thay cho Guzzle SDK tự tạo
 ]);
 ```
 
