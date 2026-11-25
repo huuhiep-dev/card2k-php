@@ -9,8 +9,6 @@ use Card2K\Laravel\Events\DepositCompleted;
 use Card2K\Laravel\Events\OrderUpdated;
 use Card2K\Laravel\Events\WebhookReceived;
 use Card2K\Laravel\WebhookRoute;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
@@ -57,7 +55,31 @@ final class WebhookRouteTest extends LaravelTestCase
         $route = Route::getRoutes()->match(Request::create('/card2k/webhook', 'POST'));
         self::assertSame('card2k.webhook', $route->getName());
         self::assertSame(['POST'], array_values(array_diff($route->methods(), ['HEAD'])));
-        self::assertNotEmpty(array_intersect([VerifyCsrfToken::class, ValidateCsrfToken::class], $route->excludedMiddleware()));
+    }
+
+    /**
+     * Laravel skips its CSRF check while testing, so a request cannot show it: look at the
+     * middleware the route really runs, the "web" group's included, once exclusions apply.
+     */
+    public function test_no_csrf_middleware_of_any_laravel_version_runs_on_the_webhook(): void
+    {
+        // The HTTP kernel gives the router its middleware groups.
+        $this->laravel()->make(\Illuminate\Contracts\Http\Kernel::class);
+        $router = $this->laravel()->make('router');
+        $web = $router->getMiddlewareGroups()['web'] ?? [];
+        $isCsrf = static fn (mixed $middleware): bool => is_string($middleware) && array_filter(
+            WebhookRoute::CSRF_MIDDLEWARE,
+            static fn (string $class): bool => class_exists($class) && is_a(explode(':', $middleware)[0], $class, true),
+        ) !== [];
+
+        // The group does check CSRF, so the test means something.
+        self::assertNotEmpty(array_filter($web, $isCsrf), 'Nhóm web không có middleware CSRF nào.');
+
+        $route = Route::getRoutes()->match(Request::create('/card2k/webhook', 'POST'));
+        $running = $router->gatherRouteMiddleware($route);
+
+        self::assertContains('web', $route->middleware());
+        self::assertSame([], array_values(array_filter($running, $isCsrf)));
     }
 
     public function test_each_kind_of_event_is_dispatched_with_its_model(): void

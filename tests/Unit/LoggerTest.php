@@ -19,7 +19,14 @@ final class LoggerTest extends TestCase
             /** @var list<array{level: mixed, message: string, context: array<mixed>}> */
             public array $records = [];
 
-            public function log($level, string|Stringable $message, array $context = []): void
+            /**
+             * No parameter types: psr/log 1.x declares none, 3.x declares them; this fits both.
+             *
+             * @param  mixed  $level
+             * @param  string|Stringable  $message
+             * @param  array<mixed>  $context
+             */
+            public function log($level, $message, array $context = []): void
             {
                 $this->records[] = ['level' => $level, 'message' => (string) $message, 'context' => $context];
             }
