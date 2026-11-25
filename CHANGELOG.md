@@ -4,6 +4,11 @@ Theo [Semantic Versioning](https://semver.org/lang/vi/). Trước 1.0.0, bản M
 
 ## [Chưa phát hành]
 
+## 0.3.0 (2026-11-26)
+
+- `new Card2K\Client()` không cần truyền key: SDK tự đọc biến môi trường `CARD2K_API_KEY` (`$_ENV`, `$_SERVER`, `getenv()`). Truyền key vẫn chạy như cũ và được ưu tiên.
+- README: giải thích id gói / id ô bằng ví dụ thật, dữ liệu mẫu thu gọn ("Xem dữ liệu trả về") cho sản phẩm, đơn, thẻ đổi, mã nạp, webhook, lỗi.
+
 ## 0.2.1 (2026-11-26)
 
 - **Sửa**: webhook Laravel bị chặn CSRF (HTTP 419) trên Laravel 13, vì Laravel 13 dùng middleware `PreventRequestForgery`. Route webhook giờ bỏ kiểm tra CSRF trên mọi bản Laravel 10–13.

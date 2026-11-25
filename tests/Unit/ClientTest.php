@@ -69,6 +69,60 @@ final class ClientTest extends TestCase
         new Client('  ');
     }
 
+    protected function tearDown(): void
+    {
+        unset($_ENV[Client::ENV_KEY], $_SERVER[Client::ENV_KEY]);
+        putenv(Client::ENV_KEY);
+        parent::tearDown();
+    }
+
+    /**
+     * Key giả từ một nơi trong môi trường.
+     */
+    private function clientFromEnvironment(): Client
+    {
+        $factory = new \Nyholm\Psr7\Factory\Psr17Factory();
+
+        return new Client(options: ['http_client' => $this->http, 'request_factory' => $factory, 'stream_factory' => $factory]);
+    }
+
+    private function sentKey(Client $client): string
+    {
+        $this->http->json(200, ['data' => []]);
+        $client->account->get();
+
+        return $this->http->last()->getHeaderLine('Authorization');
+    }
+
+    public function test_without_a_key_it_reads_card2k_api_key_from_the_environment(): void
+    {
+        $_ENV[Client::ENV_KEY] = 'key-tu-env';
+        self::assertSame('Bearer key-tu-env', $this->sentKey($this->clientFromEnvironment()));
+        unset($_ENV[Client::ENV_KEY]);
+
+        $_SERVER[Client::ENV_KEY] = 'key-tu-server';
+        self::assertSame('Bearer key-tu-server', $this->sentKey($this->clientFromEnvironment()));
+        unset($_SERVER[Client::ENV_KEY]);
+
+        putenv(Client::ENV_KEY.'=key-tu-getenv');
+        self::assertSame('Bearer key-tu-getenv', $this->sentKey($this->clientFromEnvironment()));
+    }
+
+    public function test_a_key_given_wins_over_the_environment(): void
+    {
+        $_ENV[Client::ENV_KEY] = 'key-tu-env';
+
+        self::assertSame('Bearer '.self::KEY, $this->sentKey($this->client()));
+    }
+
+    public function test_no_key_anywhere_says_where_to_put_it(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('CARD2K_API_KEY');
+
+        $this->clientFromEnvironment();
+    }
+
     public function test_without_a_client_guzzle_is_used_with_a_timeout(): void
     {
         $client = new Client(self::KEY, ['timeout' => 12]);

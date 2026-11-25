@@ -7,9 +7,9 @@
 Kết nối [Card2K](https://card2k.net) bằng PHP trong vài dòng: nạp game, mua thẻ cào, đổi thẻ cào, ví, bảo hành, webhook. **Không bao giờ trừ tiền hai lần.** Có sẵn hỗ trợ Laravel.
 
 ```php
-$card2k = new Card2K\Client(getenv('CARD2K_API_KEY'));
+$card2k = new Card2K\Client(); // key từ biến môi trường CARD2K_API_KEY
 
-$order = $card2k->orders->create(['package_id' => 12, 'fields' => [3 => 'ID game']], 'DON-1001');
+$order = $card2k->orders->create(['package_id' => 216, 'fields' => [7 => '123456789']], 'DON-1001');
 ```
 
 ## Mục lục
@@ -58,19 +58,19 @@ Cần PHP 8.1+ và một thư viện HTTP chuẩn PSR-18: có Guzzle (Laravel c�
 ## Bắt đầu nhanh
 
 1. Ở **Tài khoản → Kết nối API**, tạo kết nối loại **API v3**, bật quyền cần dùng, sao chép key.
-2. Lưu key vào biến môi trường `CARD2K_API_KEY`.
+2. Lưu key vào biến môi trường `CARD2K_API_KEY` (file `.env`, cấu hình hosting…). SDK tự đọc; muốn truyền tay thì `new Card2K\Client('key')`.
 3. Gọi API:
 
 ```php
-$card2k = new Card2K\Client(getenv('CARD2K_API_KEY'));
+$card2k = new Card2K\Client();
 
 echo $card2k->account->get()->balance; // số dư Ví mua hàng
 
-$order = $card2k->orders->create(['package_id' => 12, 'fields' => [3 => 'ID game']], 'DON-1001');
+$order = $card2k->orders->create(['package_id' => 216, 'fields' => [7 => '123456789']], 'DON-1001');
 echo $order->status; // pending → completed (qua webhook hoặc $card2k->orders->get($order->code))
 ```
 
-`DON-1001` là mã đơn bên bạn: gửi lại cùng mã thì chỉ nhận lại đơn cũ, không trừ tiền lần nữa.
+`216` là id gói, `7` là id ô cần điền (xem [Sản phẩm và đặt đơn](#sản-phẩm-và-đặt-đơn)). `DON-1001` là mã đơn bên bạn: gửi lại cùng mã thì chỉ nhận lại đơn cũ, không trừ tiền lần nữa.
 
 > Giữ key ở máy chủ (biến môi trường). Không đưa vào trình duyệt, app hay mã nguồn công khai.
 
@@ -145,7 +145,7 @@ Listener nên chạy hàng đợi (`ShouldQueue`) để trả 200 nhanh. Listene
 
 ## Dịch vụ
 
-Các ví dụ dùng `$card2k = new Card2K\Client(getenv('CARD2K_API_KEY'));` (Laravel: `Card2K::orders()`… thay cho `$card2k->orders`…).
+Các ví dụ dùng `$card2k = new Card2K\Client();` (Laravel: `Card2K::orders()`… thay cho `$card2k->orders`…). Dữ liệu mẫu chỉ giữ các field chính; đủ mọi field ở [tài liệu API](https://card2k.net/tai-lieu-api).
 
 ### Quyền của key
 
@@ -172,30 +172,73 @@ print_r($account->scopes);       // ['orders', 'card_exchange', …]
 
 ### Sản phẩm và đặt đơn
 
+**Bước 1: xem gói và các ô cần điền.** Mỗi sản phẩm có các gói (`packages`, đặt đơn bằng `id` gói) và các ô khách phải điền (`fields`: ID game, server…; gửi theo `id` ô).
+
 ```php
 use Card2K\ProductType;
 
-foreach ($card2k->products->list(ProductType::GAME) as $product) {
-    echo $product->id, ' ', $product->name, PHP_EOL;
-    foreach ($product->packages as $package) {
-        echo '  gói ', $package->id, ': ', $package->name, ' – ', $package->price, 'đ', PHP_EOL;
-    }
-    foreach ($product->fields as $field) {
-        echo '  cần điền ô ', $field->id, ': ', $field->label, PHP_EOL;
-    }
-}
+$products = $card2k->products->list(ProductType::GAME); // mọi sản phẩm nạp game
+$product = $card2k->products->get(21);                   // một sản phẩm
+```
 
+<details>
+<summary>Xem dữ liệu trả về</summary>
+
+```json
+{
+  "id": 21,
+  "name": "Liên Quân Mobile (Garena)",
+  "type": "game",
+  "fields": [
+    { "id": 7, "label": "UID người chơi", "type": "text", "required": true, "options": [] }
+  ],
+  "packages": [
+    { "id": 216, "name": "40 Quân Huy", "price": 19400, "list_price": 19400, "in_stock": true },
+    { "id": 217, "name": "102 Quân huy", "price": 48500, "list_price": 48500, "in_stock": true }
+  ]
+}
+```
+
+</details>
+
+**Bước 2: đặt đơn.** `fields` là `[id ô => giá trị]`; thẻ cào thì không có ô nào.
+
+```php
 $order = $card2k->orders->create([
-    'package_id' => 12,
+    'package_id' => 216,
     'quantity' => 1,
-    'fields' => [3 => '123456789', 4 => 'Asia'], // [id ô => giá trị]
-    'voucher_code' => 'GIAM10',                  // không bắt buộc
+    'fields' => [7 => '123456789'],
+    'voucher_code' => 'GIAM10', // không bắt buộc
 ], 'DON-1001');
 
 foreach ($order->cards as $card) { // thẻ cào giao ngay
     echo $card->serial, ' / ', $card->code, PHP_EOL;
 }
 ```
+
+<details>
+<summary>Xem dữ liệu trả về</summary>
+
+```json
+{
+  "code": "DH8K2M4PQX",
+  "reference": "DON-1001",
+  "status": "completed",
+  "product": { "id": 21, "name": "Liên Quân Mobile (Garena)", "type": "game" },
+  "package": { "id": 216, "name": "40 Quân Huy" },
+  "quantity": 1,
+  "total": 19400,
+  "fields": [{ "id": 7, "label": "UID người chơi", "value": "123456789" }],
+  "items": [{ "id": 10429, "status": "completed", "note": null, "cards": [] }],
+  "cards": [],
+  "created_at": "2026-11-25T18:06:48+00:00",
+  "completed_at": "2026-11-25T18:09:10+00:00"
+}
+```
+
+</details>
+
+Đơn nạp game thường `pending` rồi mới `completed` (hoặc `refunded` kèm `note`): nhận qua [webhook](#webhook) hoặc tra lại bằng `orders->get()`.
 
 Sò Garena hàng chờ thì thêm `queue`, đổi phí ưu tiên được sau khi đặt; kiểm tra mã giảm giá trước khi đặt:
 
@@ -205,7 +248,7 @@ $order = $card2k->orders->create([
     'queue' => ['account' => 'ten-tai-khoan', 'priority_percent' => 3], // hoặc 'top' => true
 ], 'DON-1002');
 
-$result = $card2k->orders->changeQueuePriority($order->code, $order->items[0]->id, ['priority_percent' => 6]);
+$result = $card2k->orders->changeQueuePriority($order->code, $order->items[0]->id, ['priority_percent' => 6]); // items[].id của đơn
 echo $result->difference; // dương: trừ thêm, âm: hoàn lại
 
 $check = $card2k->vouchers->check(['package_id' => 12, 'voucher_code' => 'GIAM10']);
@@ -256,6 +299,29 @@ if ($card->status === CardExchangeStatus::SUCCESS) {
 }
 ```
 
+<details>
+<summary>Xem dữ liệu trả về (thẻ đã có kết quả)</summary>
+
+```json
+{
+  "id": "457406653011",
+  "reference": "THE-5001",
+  "status": "success",
+  "telco": "VIETTEL",
+  "serial": "10012345678901",
+  "declared_value": 50000,
+  "value": 50000,
+  "fee_percent": 18.7,
+  "amount": 40650,
+  "message": null,
+  "completed_at": "2026-11-25T18:12:03+00:00"
+}
+```
+
+</details>
+
+`status`: `pending` (chờ nhà mạng), `success`, `wrong_value` (sai mệnh giá, bị phạt), `invalid`, `failed`. `amount` là tiền cộng vào Ví đổi thẻ.
+
 ### Ví và nạp tiền
 
 ```php
@@ -277,6 +343,27 @@ foreach ($card2k->transactions->all(['wallet' => Wallet::EXCHANGE, 'from' => new
     echo $tx->created_at, ' ', $tx->amount, ' ', $tx->description, PHP_EOL;
 }
 ```
+
+<details>
+<summary>Xem dữ liệu trả về của deposits->create()</summary>
+
+```json
+{
+  "code": "AB12CD",
+  "transfer_content": "NAPAB12CD",
+  "status": "pending",
+  "min_amount": 10000,
+  "max_amount": 50000000,
+  "expires_at": "2026-11-25T18:40:00+00:00",
+  "accounts": [
+    { "bank_label": "Vietcombank", "account_number": "0123456789", "account_name": "NGUYEN VAN A", "bin": "970436" }
+  ]
+}
+```
+
+</details>
+
+Chuyển khoản đúng `transfer_content` tới một trong `accounts` là Ví mua hàng được cộng (webhook `deposit.completed`).
 
 ### Bảo hành
 
@@ -302,6 +389,20 @@ foreach ($card2k->warrantyClaims->all(['order_code' => 'DH123456']) as $claim) {
 | `card_exchange.updated` | Thẻ có kết quả | `Card2K\Model\CardExchange` |
 | `deposit.completed` | Tiền nạp đã tới | `Card2K\Model\Deposit` |
 | `webhook.test` | Bạn bấm "Gửi webhook thử" | mảng `{partner_id, message}` |
+
+<details>
+<summary>Xem body shop gửi tới (rút gọn: `data` là đơn đầy đủ như `orders->get()`)</summary>
+
+```json
+{
+  "event": "order.updated",
+  "event_id": "9b2f6a4e-3c1d-4f8a-9e7b-1a2b3c4d5e6f",
+  "created_at": "2026-11-25T18:09:10+00:00",
+  "data": { "code": "DH8K2M4PQX", "reference": "DON-1001", "status": "completed", "total": 19400 }
+}
+```
+
+</details>
 
 ```php
 use Card2K\Model\CardExchange;
@@ -341,6 +442,25 @@ foreach ($card2k->events->all($eventIdDaLuu) as $event) { // null lần đầu
 ## Xử lý lỗi
 
 Mọi lỗi kế thừa `Card2K\Exception\Card2KException`. Lỗi từ API là `ApiException` (và lớp con theo mã HTTP); xử lý theo `getErrorCode()`, không theo câu chữ.
+
+<details>
+<summary>Xem lỗi API trả về (SDK đổi thành InsufficientBalanceException)</summary>
+
+```http
+HTTP/1.1 402 Payment Required
+X-Request-Id: 012a1b24-2511-4b19-b4e9-bf7a5e7c70be
+
+{
+  "error": {
+    "code": "insufficient_balance",
+    "message": "Số dư không đủ, cần 19.400đ.",
+    "required": 19400,
+    "balance": 0
+  }
+}
+```
+
+</details>
 
 ```php
 use Card2K\ErrorCode;
@@ -391,7 +511,7 @@ Danh sách mã đầy đủ: `Card2K\ErrorCode`. Shop có thể thêm mã mới,
 ## Cấu hình
 
 ```php
-$card2k = new Card2K\Client(getenv('CARD2K_API_KEY'), [
+$card2k = new Card2K\Client(options: [ // key vẫn từ CARD2K_API_KEY; hoặc new Card2K\Client('key', [...])
     'timeout' => 20,              // giây, khi SDK tự tạo Guzzle (mặc định 30)
     'max_retries' => 3,           // mặc định 2; 0 = không thử lại
     'max_retry_delay' => 10,      // Retry-After lâu hơn thì ném lỗi luôn (mặc định 20 giây)
