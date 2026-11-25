@@ -4,6 +4,11 @@ Theo [Semantic Versioning](https://semver.org/lang/vi/). Trước 1.0.0, bản M
 
 ## [Chưa phát hành]
 
+## 0.2.1 (2026-11-26)
+
+- **Sửa**: webhook Laravel bị chặn CSRF (HTTP 419) trên Laravel 13, vì Laravel 13 dùng middleware `PreventRequestForgery`. Route webhook giờ bỏ kiểm tra CSRF trên mọi bản Laravel 10–13.
+- README một trang, có mục lục; bỏ thư mục `docs/`.
+
 ## 0.2.0 (2026-11-26)
 
 - **Laravel**: tự nhận gói; client từ `CARD2K_API_KEY` trong `.env`; Facade `Card2K::orders()…`; `Route::card2kWebhook()` kiểm chữ ký, bỏ sự kiện trùng, phát event `OrderUpdated`, `CardExchangeUpdated`, `DepositCompleted`, `WebhookReceived`.
