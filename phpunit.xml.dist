@@ -11,6 +11,9 @@
         <testsuite name="SDK">
             <directory>tests/Unit</directory>
         </testsuite>
+        <testsuite name="Laravel">
+            <directory>tests/Laravel</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
