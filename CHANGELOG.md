@@ -4,6 +4,14 @@ Theo [Semantic Versioning](https://semver.org/lang/vi/). Trước 1.0.0, bản M
 
 ## [Chưa phát hành]
 
+## 0.2.0 (2026-11-26)
+
+- **Laravel**: tự nhận gói; client từ `CARD2K_API_KEY` trong `.env`; Facade `Card2K::orders()…`; `Route::card2kWebhook()` kiểm chữ ký, bỏ sự kiện trùng, phát event `OrderUpdated`, `CardExchangeUpdated`, `DepositCompleted`, `WebhookReceived`.
+- Tùy chọn `logger` (PSR-3): mỗi lần gọi ghi phương thức, đường dẫn, mã HTTP, thời gian, `X-Request-Id`; không ghi key, body, mã thẻ.
+- Các service gọi được cả dạng hàm: `$client->orders()` như `$client->orders`.
+- README ngắn gọn (vì sao dùng SDK, bắt đầu trong 1 phút); tài liệu chi tiết chuyển vào `docs/`.
+- Thêm thư viện bắt buộc `psr/log` (chuẩn PSR-3, rất nhỏ).
+
 ## 0.1.0 (2026-11-26)
 
 Bản đầu tiên, đủ mọi endpoint của API v3 (spec 3.1.0):

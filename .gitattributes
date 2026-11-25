@@ -4,6 +4,7 @@
 # Not shipped to people who install the package
 /.github export-ignore
 /bin export-ignore
+/docs export-ignore
 /resources export-ignore
 /tests export-ignore
 /.gitattributes export-ignore

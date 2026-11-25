@@ -24,6 +24,7 @@ use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Client của API v3.
@@ -37,7 +38,7 @@ use Psr\Http\Message\StreamFactoryInterface;
  */
 final class Client
 {
-    public const VERSION = '0.1.0';
+    public const VERSION = '0.2.0';
 
     public const DEFAULT_BASE_URL = 'https://card2k.net';
 
@@ -65,13 +66,14 @@ final class Client
 
     /**
      * @param  string  $apiKey  key của kết nối loại "API v3" (Tài khoản → Kết nối API)
-     * @param  array{base_url?: string, http_client?: ClientInterface, request_factory?: RequestFactoryInterface, stream_factory?: StreamFactoryInterface, timeout?: float|int, max_retries?: int, max_retry_delay?: float|int, sleep?: callable(float): void, user_agent?: string}  $options
+     * @param  array{base_url?: string, http_client?: ClientInterface, request_factory?: RequestFactoryInterface, stream_factory?: StreamFactoryInterface, timeout?: float|int, max_retries?: int, max_retry_delay?: float|int, sleep?: callable(float): void, user_agent?: string, logger?: LoggerInterface|null}  $options
      *   - `base_url`: tên miền của shop, mặc định https://card2k.net (bắt buộc https, trừ localhost)
      *   - `http_client`: client PSR-18 của bạn; bỏ trống thì SDK dùng Guzzle nếu có, không thì tự tìm (Symfony…)
      *   - `timeout`: số giây chờ mỗi request khi SDK tự tạo Guzzle, mặc định 30 (kết nối tối đa 10 giây)
      *   - `max_retries`: số lần thử lại khi lỗi mạng / 429 / 5xx, mặc định 2
      *   - `max_retry_delay`: chờ tối đa bao nhiêu giây trước một lần thử lại, mặc định 20
      *   - `user_agent`: thêm vào sau User-Agent của SDK, ví dụ tên hệ thống của bạn
+     *   - `logger`: logger PSR-3: mỗi lần gọi ghi phương thức, đường dẫn, mã HTTP, thời gian, X-Request-Id (không ghi key, body, mã thẻ)
      */
     public function __construct(string $apiKey, array $options = [])
     {
@@ -104,6 +106,7 @@ final class Client
             (float) ($options['max_retry_delay'] ?? 20),
             Closure::fromCallable($sleep),
             $userAgent,
+            $options['logger'] ?? null,
         );
 
         $this->account = new AccountService($this->transport);
@@ -116,6 +119,59 @@ final class Client
         $this->vouchers = new VoucherService($this->transport);
         $this->deposits = new DepositService($this->transport);
         $this->wallet = new WalletService($this->transport);
+    }
+
+    /**
+     * Các service dạng hàm, cho Facade của Laravel (`Card2K::orders()->create(…)`).
+     */
+    public function account(): AccountService
+    {
+        return $this->account;
+    }
+
+    public function products(): ProductService
+    {
+        return $this->products;
+    }
+
+    public function orders(): OrderService
+    {
+        return $this->orders;
+    }
+
+    public function warrantyClaims(): WarrantyClaimService
+    {
+        return $this->warrantyClaims;
+    }
+
+    public function events(): EventService
+    {
+        return $this->events;
+    }
+
+    public function transactions(): TransactionService
+    {
+        return $this->transactions;
+    }
+
+    public function cardExchanges(): CardExchangeService
+    {
+        return $this->cardExchanges;
+    }
+
+    public function vouchers(): VoucherService
+    {
+        return $this->vouchers;
+    }
+
+    public function deposits(): DepositService
+    {
+        return $this->deposits;
+    }
+
+    public function wallet(): WalletService
+    {
+        return $this->wallet;
     }
 
     /**

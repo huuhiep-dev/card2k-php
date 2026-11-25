@@ -28,6 +28,7 @@ use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Gửi request tới API v3: thêm key và header, thử lại khi nên thử, đổi lỗi thành exception.
@@ -58,6 +59,7 @@ final class Transport
         private readonly float $maxRetryDelay,
         private readonly Closure $sleep,
         private readonly string $userAgent,
+        private readonly ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -75,9 +77,13 @@ final class Transport
         $request = $this->build($method, $path, $query, $body, $headers);
 
         for ($attempt = 0; ; $attempt++) {
+            $startedAt = microtime(true);
             try {
                 $response = $this->http->sendRequest($request);
             } catch (ClientExceptionInterface $exception) {
+                $this->logger?->warning('Card2K API: không kết nối được', [
+                    'method' => $method, 'path' => $path, 'attempt' => $attempt + 1, 'error' => $exception->getMessage(),
+                ]);
                 $retryable = $exception instanceof NetworkExceptionInterface || ! $exception instanceof RequestExceptionInterface;
                 if ($retryable && $attempt < $this->maxRetries) {
                     ($this->sleep)($this->backoff($attempt));
@@ -90,6 +96,15 @@ final class Transport
 
             $this->lastResponse = $response;
             $status = $response->getStatusCode();
+            // Never the key, the body or a card code: only what helps to ask the shop about a call.
+            $this->logger?->log($status >= 400 ? 'warning' : 'info', 'Card2K API', [
+                'method' => $method,
+                'path' => $path,
+                'status' => $status,
+                'ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'request_id' => $this->requestId($response),
+                'attempt' => $attempt + 1,
+            ]);
 
             if ($status >= 200 && $status < 300) {
                 return $this->decodeSuccess($response);
